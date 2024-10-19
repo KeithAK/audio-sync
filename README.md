@@ -1,2 +1,2 @@
 # audio-sync
-Tool to help adding &amp; synchronising additional audio tracks to video files.
+Tool to help add &amp; synchronise additional audio tracks to video files.

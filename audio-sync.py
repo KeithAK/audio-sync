@@ -2,11 +2,12 @@ import subprocess, librosa, os, json, datetime
 import numpy as np
 from scipy.signal import correlate
 
-FILE1 = 'audio_file_eng.ac3'
-FILE2 = 'audio_file_ger.ac3'
-NR_OF_SAMPLES = 5 # nr. of samples spread across shortest audio file
-SAMPLE_LEN = 120 # sample length in seconds
+FILE1 = 'reference.ac3'
+FILE2 = 'source.ac3'
 SR = 16000 # audio sample Rate
+# some randomness involved here, will be removed after further testing
+NR_OF_SAMPLES = int(np.random.choice(range(5, 10))) # nr. of samples spread across shortest audio file
+SAMPLE_LEN = int(np.random.choice(range(60, 240))) # sample length in seconds
 
 def get_audio_duration(file_path):
     """Uses ffprobe to get the duration of an audio file."""
@@ -39,7 +40,7 @@ def detect_warp_or_stretch(offsets, std_threshold=100):
         print(f"Warning: Files may be warped/stretched. Offsets: {offsets}, std dev: {std_dev:.4f})")
         return True
     else:
-        print(f"File 2 is likely synchronizable to file 1 with a single offset of {round(median)}ms (std dev = {std_dev:.4f}).")
+        print(f"File 2 has an offset of {round(median)}ms to file 1 (std dev = {std_dev:.4f}).")
         return False
 
 def extract_non_center_channels(audio_file, output_file, t_start:str, td_sample:str):
@@ -99,7 +100,7 @@ def test_correlation(file1, file2):
         offset_index = float(np.argmax(correlation))
         t_offsets_ms.append((offset_index - len(audio1)) * 1000 / sr1)
         #print(f"Timestamp: {i}, delay of track 2: {t_offset_ms[i]:.2f} ms")
-    print('Offsets calculated')
+    print(f'Offsets calculated from {NR_OF_SAMPLES} samples of {SAMPLE_LEN}s length.')
     detect_warp_or_stretch(t_offsets_ms)
 
 if __name__ == "__main__":

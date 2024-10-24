@@ -6,8 +6,8 @@ FILE1 = 'reference.ac3'
 FILE2 = 'source.ac3'
 SR = 16000 # audio sample Rate
 # some randomness involved here, will be removed after further testing
-NR_OF_SAMPLES = int(np.random.choice(range(5, 10))) # nr. of samples spread across shortest audio file
-SAMPLE_LEN = int(np.random.choice(range(60, 240))) # sample length in seconds
+NR_OF_SAMPLES = int(np.random.choice(range(3, 8))) # nr. of samples spread across shortest audio file
+SAMPLE_LEN = int(np.random.choice(range(60, 120))) # sample length in seconds
 
 def get_audio_duration(file_path):
     """Uses ffprobe to get the duration of an audio file."""
@@ -38,10 +38,10 @@ def detect_warp_or_stretch(offsets, std_threshold=100):
     # If the standard deviation exceeds the threshold, return True (files may be warped or stretched)
     if std_dev > std_threshold:
         print(f"Warning: Files may be warped/stretched. Offsets: {offsets}, std dev: {std_dev:.4f})")
-        return True
+        return 0, 0
     else:
         print(f"File 2 has an offset of {round(median)}ms to file 1 (std dev = {std_dev:.4f}).")
-        return False
+        return median, std_dev
 
 def extract_non_center_channels(audio_file, output_file, t_start:str, td_sample:str):
     """
@@ -69,7 +69,8 @@ def load_audio(file_path):
 
 def test_correlation(file1, file2):
     if not os.path.exists(file1) & os.path.exists(file2):
-        return print('File not found.')
+        print('File not found.') 
+        return 0, 0
     # generate timestamps spread across the shortest file
     duration1 = get_audio_duration(file1)
     duration2 = get_audio_duration(file2)
@@ -77,7 +78,7 @@ def test_correlation(file1, file2):
     if dur_diff > 15*60:
         print('Audio most likely warped or from different cuts.')
         print(f'Duration file1: {datetime.timedelta(seconds=duration1)}, file2: {datetime.timedelta(seconds=duration2)}, difference: {datetime.timedelta(seconds=dur_diff)}')
-        return 0
+        return 0, 0
     shorter_duration = min(duration1, duration2) # Get the shorter duration
     t_sample = str(datetime.timedelta(seconds=SAMPLE_LEN))
     timestamps = generate_timestamps(shorter_duration - SAMPLE_LEN) # Generate 10 timestamps
@@ -101,8 +102,8 @@ def test_correlation(file1, file2):
         t_offsets_ms.append((offset_index - len(audio1)) * 1000 / sr1)
         #print(f"Timestamp: {i}, delay of track 2: {t_offset_ms[i]:.2f} ms")
     print(f'Offsets calculated from {NR_OF_SAMPLES} samples of {SAMPLE_LEN}s length.')
-    detect_warp_or_stretch(t_offsets_ms)
+    median, std_dev = detect_warp_or_stretch(t_offsets_ms)
+    return median, std_dev
 
 if __name__ == "__main__":
-    # Replace with paths to your .mka files
     test_correlation(FILE1, FILE2)

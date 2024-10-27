@@ -6,7 +6,7 @@ FILE1 = 'reference.ac3'
 FILE2 = 'source.ac3'
 SR = 16000 # audio sample Rate
 # some randomness involved here, will be removed after further testing
-NR_OF_SAMPLES = int(np.random.choice(range(3, 8))) # nr. of samples spread across shortest audio file
+NR_OF_SAMPLES = int(np.random.choice(range(5, 11))) # nr. of samples spread across shortest audio file
 SAMPLE_LEN = int(np.random.choice(range(60, 120))) # sample length in seconds
 
 def get_audio_duration(file_path):
@@ -38,10 +38,10 @@ def detect_warp_or_stretch(offsets, std_threshold=100):
     # If the standard deviation exceeds the threshold, return True (files may be warped or stretched)
     if std_dev > std_threshold:
         print(f"Warning: Files may be warped/stretched. Offsets: {offsets}, std dev: {std_dev:.4f})")
-        return 0, 0
+        return offsets, median, std_dev
     else:
         print(f"File 2 has an offset of {round(median)}ms to file 1 (std dev = {std_dev:.4f}).")
-        return median, std_dev
+        return offsets, median, std_dev
 
 def extract_non_center_channels(audio_file, output_file, t_start:str, td_sample:str):
     """
@@ -67,7 +67,10 @@ def load_audio(file_path):
     audio, sr = librosa.load(file_path, sr=SR)
     return audio, sr
 
-def test_correlation(file1, file2):
+def find_offset(file1, file2):
+    """
+    Finds the best fitting offset value that would put file2 in sync with file1.  
+    """
     if not os.path.exists(file1) & os.path.exists(file2):
         print('File not found.') 
         return 0, 0
@@ -85,14 +88,16 @@ def test_correlation(file1, file2):
     # Step 1: Extract audio from both .mka files to .wav files
     t_offsets_ms = []
     for i, t in enumerate(timestamps):
-        #print()
+        file_out_1 = f'tmp/audio{i}_1.wav'
+        file_out_2 = f'tmp/audio{i}_2.wav'
+
         t_start = str(datetime.timedelta(seconds=t))
-        extract_non_center_channels(file1, 'audio1.wav', t_start, t_sample)
-        extract_non_center_channels(file2, 'audio2.wav', t_start, t_sample)
+        extract_non_center_channels(file1, file_out_1, t_start, t_sample)
+        extract_non_center_channels(file2, file_out_2, t_start, t_sample)
 
         # Step 2: Load the extracted audio
-        audio1, sr1 = load_audio('audio1.wav')
-        audio2, sr2 = load_audio('audio2.wav')
+        audio1, sr1 = load_audio(file_out_1)
+        audio2, sr2 = load_audio(file_out_2)
 
         # Step 4: Compute cross-correlation
         correlation = correlate(audio1, audio2)
@@ -102,8 +107,8 @@ def test_correlation(file1, file2):
         t_offsets_ms.append((offset_index - len(audio1)) * 1000 / sr1)
         #print(f"Timestamp: {i}, delay of track 2: {t_offset_ms[i]:.2f} ms")
     print(f'Offsets calculated from {NR_OF_SAMPLES} samples of {SAMPLE_LEN}s length.')
-    median, std_dev = detect_warp_or_stretch(t_offsets_ms)
-    return median, std_dev
+    offsets, median, std_dev = detect_warp_or_stretch(t_offsets_ms)
+    return offsets, median, std_dev
 
 if __name__ == "__main__":
-    test_correlation(FILE1, FILE2)
+    find_offset(FILE1, FILE2)

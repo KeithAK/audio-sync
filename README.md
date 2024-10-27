@@ -4,6 +4,7 @@ Tool to help add &amp; synchronise additional audio tracks to video files.
 Current state: Finds the offset between to audio files extracted from video files (ripped movies/tv). Files must be multi-channel audio for now (.dts/.ac3/.eac3/...)
 Offset is returned in milliseconds.
 
+streamlit app can be started with: streamlit run app.py
 
 Usage example:
 * Extract an audio track from a movie file (original) of which you wish to add a new track to (reference)

@@ -2,8 +2,6 @@ import subprocess, librosa, os, json, datetime
 import numpy as np
 from scipy.signal import correlate
 
-FILE1 = 'reference.ac3'
-FILE2 = 'source.ac3'
 SR = 16000 # audio sample Rate
 # some randomness involved here, will be removed after further testing
 NR_OF_SAMPLES = int(np.random.choice(range(5, 11))) # nr. of samples spread across shortest audio file
@@ -109,6 +107,3 @@ def find_offset(file1, file2):
     print(f'Offsets calculated from {NR_OF_SAMPLES} samples of {SAMPLE_LEN}s length.')
     offsets, median, std_dev = detect_warp_or_stretch(t_offsets_ms)
     return offsets, median, std_dev
-
-if __name__ == "__main__":
-    find_offset(FILE1, FILE2)

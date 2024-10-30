@@ -56,7 +56,7 @@ def list_audio_tracks(mkv_file_path: str) -> List[Tuple[str, str]]:
         raise RuntimeError(f"An error occurred: {e}")
 
 
-def extract_audio_track(mkv_file_path: str, track_id: int, output_codec: str = 'aac', output_dir: str = "tmp") -> str:
+def extract_audio_track(mkv_file_path: str, track_id: int, track_lang: str, output_codec: str = 'aac', output_dir: str = "tmp") -> str:
     """
     Extracts a specified audio track from an .mkv file using mkvextract.
 
@@ -74,7 +74,8 @@ def extract_audio_track(mkv_file_path: str, track_id: int, output_codec: str = '
         os.makedirs(output_dir)
 
     # Determine output file name and path
-    output_file_path = os.path.join(output_dir, f"track_{track_id}.{output_codec}")  # Defaulting to .aac; update if needed
+    base_name = os.path.splitext(os.path.basename(mkv_file_path))[0]
+    output_file_path = os.path.join(output_dir, f"{base_name}_track{track_id}_{track_lang}.{output_codec}")  # Defaulting to .aac; update if needed
 
     try:
         # Execute mkvextract command
@@ -95,14 +96,48 @@ def extract_audio_track(mkv_file_path: str, track_id: int, output_codec: str = '
     except Exception as e:
         raise RuntimeError(f"An error occurred: {e}")
 
+def mux_src_to_ref_offset(file_path_ref_vid: str, file_path_src_vid: str, src_track_id: str, offset_src_to_ref: int, path_output: str) -> str:
+    """
+    Merges an audio file from one video file into another video file using mkvmerge, with the audio offset and no "default" flag.
 
-if __name__ == "__main__":
-    FILE = 'tmp/'
-    audio_tracks = list_audio_tracks(FILE)
-    print('')
-    print(audio_tracks)
-    track_id_sel = int(input("Extract which track ID? "))-1 #track id for mkv extract and merge is n-1
-    track_id = audio_tracks[track_id_sel][0]
-    codec = audio_tracks[track_id_sel][2]
+    Parameters:
+    - file_path_ref_vid: str : Path to the reference video file.
+    - file_path_src_vid: str : Path to the source video file.
+    - src_track_id: str : Track ID to merge
+    - offset_src_to_ref: int : Offset in milliseconds from source to reference.
+    - path_output: str : Directory where the merged file will be saved.
 
-    extract_audio_track(FILE, track_id, codec)
+    Returns:
+    - str : Path to the created merged video file.
+    """
+    # Extract base filename for output
+    base_name = os.path.splitext(os.path.basename(file_path_ref_vid))[0]
+    output_file_path = os.path.join(path_output, f"{base_name}.mkv")
+    # Construct mkvmerge command
+    mkvmerge_command = [
+        'mkvmerge',
+        '-o', output_file_path, # Output file path
+        file_path_ref_vid,      # Reference video file with original audio tracks
+        '--no-video',           # Only merge audio
+        '--no-subtitles',       # Only merge audio
+        '--audio-tracks', f'{src_track_id}',    # Track ID to merge
+        '--track-name', f'{src_track_id}:',     # Ensure no custom track name is set for the audio
+        '--default-track-flag', '0',    # Remove the "default" flag from the audio track
+        '--sync', f'{src_track_id}:{offset_src_to_ref}',    # Apply offset to the audio track
+        file_path_src_vid   # Source video file to merge
+    ]
+    try:
+        # Run the mkvmerge command
+        result = subprocess.run(mkvmerge_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+        # Check if mkvmerge executed successfully
+        if result.returncode != 0:
+            raise RuntimeError(f"mkvmerge failed: {result.stderr}")
+        print(f"Merged file created successfully at: {output_file_path}")
+
+        return output_file_path
+
+    except FileNotFoundError:
+        raise FileNotFoundError("mkvmerge not found. Please ensure mkvtoolnix is installed and mkvmerge is accessible.")
+    except Exception as e:
+        raise RuntimeError(f"An error occurred: {e}")

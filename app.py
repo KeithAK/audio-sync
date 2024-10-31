@@ -1,20 +1,25 @@
-import os
+import os, glob
 import streamlit as st
 import pandas as pd
-from pathlib import Path
+from pathlib import Path, PurePath
 from mkv_funcs import list_audio_tracks, extract_audio_track, mux_src_to_ref_offset
 from audio_sync import find_offset
 from typing import List, Tuple
 
-FILE_DIR = 'imp'
+FILE_DIR = '/Volumes/data/media/movies_backup/'
 TBL_COL = ['Track ID','Language','Codec']
-if not os.path.exists(FILE_DIR):
-    os.mkdir(FILE_DIR)
 
-def file_selector(file_tag:str, folder_path=FILE_DIR):
-    filenames = os.listdir(folder_path)
-    selected_filename = st.selectbox(f'Select the {file_tag} file', filenames)
-    return os.path.join(folder_path, selected_filename)
+def file_selector(file_tag:str):
+    file_paths = sorted(glob.glob(f'{FILE_DIR}/**/*.mkv', recursive = True))
+    files_with_dir = []
+    files_with_dir2 = []
+    for i in range(len(file_paths)):
+        files_with_dir.append(PurePath(file_paths[i]))
+        files_with_dir2.append(os.path.join(files_with_dir[i].parent.name, files_with_dir[i].name))
+    sel_file = st.selectbox(f'Select the {file_tag} file', files_with_dir2)
+    sel_file_idx = files_with_dir2.index(sel_file)
+    sel_file_path = file_paths[sel_file_idx]
+    return sel_file_path
 
 def disp_tbl(columns: List[str], data: List[Tuple]):
     """

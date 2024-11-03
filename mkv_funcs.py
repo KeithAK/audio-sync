@@ -1,5 +1,89 @@
-import subprocess, os, re
+import subprocess, os, re, json
 from typing import List, Tuple
+from config import DEL_TMP_FILES
+
+def mkvinfo_json(file_path: str, output_dir: str = ".") -> str:
+    """
+    Uses mkvmerge to retrieve metadata in JSON format from an .mkv file and saves it as a JSON file.
+
+    Parameters:
+    - file_path: str : Path to the .mkv file.
+    - output_dir: str : Directory to save the JSON file (default is current directory).
+
+    Returns:
+    - str : Path to the created JSON file.
+    """
+    try:
+        # Run mkvmerge with JSON output
+        result = subprocess.run(
+            ['mkvmerge', '-J', file_path],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        )
+        
+        # Check if mkvmerge ran successfully
+        if result.returncode != 0:
+            raise RuntimeError(f"mkvmerge failed: {result.stderr}")
+        
+        # Parse the JSON output from mkvmerge
+        metadata = json.loads(result.stdout)
+        
+        # Define the output JSON file path
+        base_name = os.path.splitext(os.path.basename(file_path))[0]
+        json_file_path = os.path.join(output_dir, f"{base_name}_mkvmerge.json")
+
+        # Write metadata to JSON file
+        with open(json_file_path, "w") as json_file:
+            json.dump(metadata, json_file, indent=4)
+        
+        return json_file_path
+
+    except FileNotFoundError:
+        raise FileNotFoundError("mkvmerge not found. Please ensure mkvtoolnix is installed and mkvmerge is accessible.")
+    except Exception as e:
+        raise RuntimeError(f"An error occurred: {e}")
+    
+def parse_mkv_info(json_file_path: str) -> dict:
+    """
+    Parses specific metadata from an mkvmerge JSON output file.
+
+    Parameters:
+    - json_file_path: str : Path to the JSON file containing mkvmerge output.
+
+    Returns:
+    - dict : Parsed information including file name, title, duration, and audio track details.
+    """
+    with open(json_file_path, 'r') as file:
+        data = json.load(file)
+    
+    # Extract general metadata
+    file_name = data.get("file_name", "N/A")
+    title = data.get("container", {}).get("properties", {}).get("title", "N/A")
+    duration_ns = data.get("container", {}).get("properties", {}).get("duration", 0)
+    duration_seconds = duration_ns / 1_000_000_000  # Convert nanoseconds to seconds
+
+    # Extract audio track information
+    audio_tracks = []
+    for track in data.get("tracks", []):
+        if track.get("type") == "audio":
+            audio_info = {
+                "track_id": track.get("id"),
+                "codec": track.get("codec"),
+                "language": track.get("properties", {}).get("language", "N/A"),
+                "track_name": track.get("properties", {}).get("track_name", "N/A"),
+                "bitrate": track.get("properties", {}).get("tag_bps", "N/A")
+            }
+            audio_tracks.append(audio_info)
+    
+    # Create a result dictionary
+    result = {
+        "file_name": file_name,
+        "title": title,
+        "duration_seconds": duration_seconds,
+        "audio_tracks": audio_tracks
+    }
+    if DEL_TMP_FILES:
+        os.remove(json_file_path)
+    return result
 
 def list_audio_tracks(mkv_file_path: str) -> List[Tuple[str, str]]:
     """
@@ -56,7 +140,7 @@ def list_audio_tracks(mkv_file_path: str) -> List[Tuple[str, str]]:
         raise RuntimeError(f"An error occurred: {e}")
 
 
-def extract_audio_track(mkv_file_path: str, track_id: int, track_lang: str, output_codec: str = 'aac', output_dir: str = "tmp") -> str:
+def extract_audio_track(mkv_file_path: str, audio_track: List[Tuple[str, str]], output_dir: str) -> str:
     """
     Extracts a specified audio track from an .mkv file using mkvextract.
 
@@ -75,12 +159,26 @@ def extract_audio_track(mkv_file_path: str, track_id: int, track_lang: str, outp
 
     # Determine output file name and path
     base_name = os.path.splitext(os.path.basename(mkv_file_path))[0]
-    output_file_path = os.path.join(output_dir, f"{base_name}_track{track_id}_{track_lang}.{output_codec}")  # Defaulting to .aac; update if needed
+    # Dictionary mapping codec names to file extensions
+    codec_extension_map = {
+        "AC-3": "ac3",
+        "E-AC-3": "eac3",
+        "TrueHD": "thd",
+        "DTS": "dts",
+        "AAC": "aac",
+        "MP3": "mp3",
+        "FLAC": "flac",
+        "Vorbis": "ogg",
+        "PCM": "wav",
+        "Opus": "opus"
+    }
+    codec = codec_extension_map[audio_track['codec']]
+    output_file_path = os.path.join(output_dir, f"{base_name}_track{audio_track['track_id']}_{audio_track['language']}.{codec}")  # Defaulting to .aac; update if needed
 
     try:
         # Execute mkvextract command
         result = subprocess.run(
-            ['mkvextract', 'tracks', mkv_file_path, f'{track_id}:{output_file_path}'],
+            ['mkvextract', 'tracks', mkv_file_path, f'{audio_track['track_id']}:{output_file_path}'],
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
         )
 
@@ -88,7 +186,7 @@ def extract_audio_track(mkv_file_path: str, track_id: int, track_lang: str, outp
         if result.returncode != 0:
             raise RuntimeError(f"mkvextract failed: {result.stderr}")
         
-        print(f"Track {track_id} extracted successfully to {output_file_path}")
+        print(f"Track {audio_track['track_id']} extracted successfully to {output_file_path}")
         return output_file_path
 
     except FileNotFoundError:

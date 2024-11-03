@@ -1,24 +1,87 @@
-import subprocess, librosa, os, json, datetime
+import subprocess, librosa, os, datetime, json
 import numpy as np
 from scipy.signal import correlate
+from config import DEL_TMP_FILES
 
 SR = 16000 # audio sample Rate
 # some randomness involved here, will be removed after further testing
 NR_OF_SAMPLES = int(np.random.choice(range(5, 11))) # nr. of samples spread across shortest audio file
 SAMPLE_LEN = int(np.random.choice(range(60, 120))) # sample length in seconds
 
-def get_audio_duration(file_path):
-    """Uses ffprobe to get the duration of an audio file."""
-    command = [
-        'ffprobe', '-v', 'error', '-show_entries', 'format=duration',
-        '-of', 'json', file_path
-    ]
-    result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    output = result.stdout.decode('utf-8')
+def get_audio_duration(file_path: str) -> float:
+    """
+    Retrieves the duration of an audio file. Uses librosa for compatible formats.
+    For non-compatible formats, ffprobe is used after wrapping files in mkv first.
+
+    Parameters:
+    - file_path: str : Path to the audio file.
+
+    Returns:
+    - float : Duration of the file in seconds.
+    """
+    # Get the file extension
+    _, ext = os.path.splitext(file_path)
     
-    # Parse the JSON output from ffprobe
-    metadata = json.loads(output)
-    return float(metadata['format']['duration'])
+    # List of file extensions that require get_truehd_duration
+    custom_formats = [".thd"]
+
+    if ext.lower() in custom_formats:
+        # Define a temporary MKV file path
+        temp_mkv_path = file_path + ".mkv"
+        
+        try:
+            # Step 1: Wrap the .TrueHD file in an MKV container using ffmpeg
+            subprocess.run(
+                ['ffmpeg', '-y', '-i', file_path, '-c', 'copy', temp_mkv_path],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True
+            )
+            print(file_path)
+            # Step 2: Use ffprobe to get duration of the MKV file
+            result = subprocess.run(
+                [
+                    'ffprobe', '-v', 'error', '-show_entries',
+                    'format=duration', '-of', 'json', temp_mkv_path
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+            # Parse the duration from JSON output
+            metadata = json.loads(result.stdout)
+            duration = float(metadata["format"]["duration"])
+
+            return duration
+
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(f"ffmpeg or ffprobe failed: {e.stderr}")
+        except FileNotFoundError:
+            raise FileNotFoundError("ffmpeg or ffprobe not found. Please ensure they are installed and accessible.")
+        except KeyError:
+            raise ValueError("Duration not found in ffprobe output.")
+        finally:
+            # Clean up the temporary MKV file
+            if os.path.exists(temp_mkv_path):
+                os.remove(temp_mkv_path)
+    else:
+        try:
+            result = subprocess.run(
+                [
+                    'ffprobe', '-v', 'error', '-show_entries',
+                    'format=duration', '-of', 'json', file_path
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+            # Parse the duration from JSON output
+            metadata = json.loads(result.stdout)
+            duration = float(metadata["format"]["duration"])
+
+            return duration
+        except Exception as e:
+            raise RuntimeError(f"Error: {e}")
 
 def generate_timestamps(duration, num_timestamps=NR_OF_SAMPLES):
     """Generates an array of equally spaced timestamps across the given duration."""
@@ -58,13 +121,7 @@ def extract_non_center_channels(audio_file, output_file, t_start:str, td_sample:
     if not os.path.exists(output_file):
         print(result.stderr.decode())
         raise FileNotFoundError(f"Failed to create output file: {output_file}")
-
-
-def load_audio(file_path):
-    """Loads audio as a waveform using librosa."""
-    audio, sr = librosa.load(file_path, sr=SR)
-    return audio, sr
-
+    
 def find_offset(file1, file2):
     """
     Finds the best fitting offset value that would put file2 in sync with file1.  
@@ -94,16 +151,18 @@ def find_offset(file1, file2):
         extract_non_center_channels(file2, file_out_2, t_start, t_sample)
 
         # Step 2: Load the extracted audio
-        audio1, sr1 = load_audio(file_out_1)
-        audio2, sr2 = load_audio(file_out_2)
+        audio1, _ = librosa.load(file_out_1, sr=SR)
+        audio2, _ = librosa.load(file_out_2, sr=SR)
 
         # Step 4: Compute cross-correlation
         correlation = correlate(audio1, audio2)
 
         # Step 5: Find and print the offset based on maximum correlation
         offset_index = float(np.argmax(correlation))
-        t_offsets_ms.append((offset_index - len(audio1)) * 1000 / sr1)
-        #print(f"Timestamp: {i}, delay of track 2: {t_offset_ms[i]:.2f} ms")
+        t_offsets_ms.append((offset_index - len(audio1)) * 1000 / SR)
+        if DEL_TMP_FILES:
+            os.remove(file_out_1)
+            os.remove(file_out_2)
     print(f'Offsets calculated from {NR_OF_SAMPLES} samples of {SAMPLE_LEN}s length.')
     offsets, median, std_dev = detect_warp_or_stretch(t_offsets_ms)
     return offsets, median, std_dev

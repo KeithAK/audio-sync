@@ -164,13 +164,14 @@ def extract_audio_track(mkv_file_path: str, audio_track: List[Tuple[str, str]], 
         "AC-3": "ac3",
         "E-AC-3": "eac3",
         "TrueHD": "thd",
+        "DTS-HD Master Audio": "dts",
         "DTS": "dts",
         "AAC": "aac",
         "MP3": "mp3",
         "FLAC": "flac",
         "Vorbis": "ogg",
         "PCM": "wav",
-        "Opus": "opus"
+        "Opus": "opus",
     }
     codec = codec_extension_map[audio_track['codec']]
     output_file_path = os.path.join(output_dir, f"{base_name}_track{audio_track['track_id']}_{audio_track['language']}.{codec}")  # Defaulting to .aac; update if needed

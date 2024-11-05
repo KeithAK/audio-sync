@@ -1,33 +1,32 @@
-# Start from a Python 3.12 slim image
 FROM python:3.12.7-slim
 
-# Set up the working directory
+# Working directory
 WORKDIR /app
 
-# Define environment variables for linked directories
+# Environment variables
 ENV DIR_MOVIES=/data/movies
 ENV DIR_TV=/data/tv
 ENV DIR_SRC=/data/src
 ENV DIR_OUTPUT=/data/output
 ENV DIR_TMP=/data/tmp
 
-# Create the directories within the container
+# Create directories within the container
 RUN mkdir -p $DIR_MOVIES $DIR_TV $DIR_SRC $DIR_OUTPUT $DIR_TMP
 
-# Install system dependencies like mkvtoolnix
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     mkvtoolnix \
     ffmpeg \
+    build-essential \
+    cmake \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy the requirements and install Python dependencies
+# Copy requirements and install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the application code into the container
 COPY . .
 
-# Expose the port for Streamlit
 EXPOSE 5656
 
 # Run the Streamlit app

@@ -23,7 +23,7 @@ def get_audio_duration(file_path: str) -> float:
     _, ext = os.path.splitext(file_path)
     
     # List of file extensions that require get_truehd_duration
-    custom_formats = [".thd"]
+    custom_formats = [".thd", ".dts"]
 
     if ext.lower() in custom_formats:
         # Define a temporary MKV file path
@@ -127,16 +127,16 @@ def find_offset(file1, file2):
     Finds the best fitting offset value that would put file2 in sync with file1.  
     """
     if not os.path.exists(file1) & os.path.exists(file2):
-        print('File not found.') 
-        return 0, 0
+        raise FileNotFoundError
     # generate timestamps spread across the shortest file
     duration1 = get_audio_duration(file1)
     duration2 = get_audio_duration(file2)
     dur_diff = abs(duration1-duration2)
-    if dur_diff > 15*60:
+    if dur_diff > (15 * 60): # over 10 minutes difference
         print('Audio most likely warped or from different cuts.')
         print(f'Duration file1: {datetime.timedelta(seconds=duration1)}, file2: {datetime.timedelta(seconds=duration2)}, difference: {datetime.timedelta(seconds=dur_diff)}')
-        return 0, 0
+        #raise Exception
+        return 0, 0, 0
     shorter_duration = min(duration1, duration2) # Get the shorter duration
     t_sample = str(datetime.timedelta(seconds=SAMPLE_LEN))
     timestamps = generate_timestamps(shorter_duration - SAMPLE_LEN) # Generate 10 timestamps

@@ -69,8 +69,7 @@ def parse_mkv_info(json_file_path: str) -> dict:
                 "track_id": track.get("id"),
                 "codec": track.get("codec"),
                 "language": track.get("properties", {}).get("language", "N/A"),
-                "track_name": track.get("properties", {}).get("track_name", "N/A"),
-                "bitrate": track.get("properties", {}).get("tag_bps", "N/A")
+                "track_name": track.get("properties", {}).get("track_name", "N/A")
             }
             audio_tracks.append(audio_info)
     

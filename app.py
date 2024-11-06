@@ -5,6 +5,7 @@ from pathlib import Path, PurePath
 from mkv_funcs import mkvinfo_json, parse_mkv_info, extract_audio_track, mux_src_to_ref_offset
 from audio_sync import find_offset
 from typing import List, Tuple
+from datetime import timedelta
 from config import DEL_TMP_FILES
 
 DIR_INPUTS_REF = ['/data/movies', '/data/tv']
@@ -12,23 +13,43 @@ DIR_INPUT_SRC = '/data/src'
 DIR_OUTPUT = '/data/output'
 DIR_TMP = '/data/tmp'
 
-def file_selector(file_tag: str, dir: str) -> str:
+def file_selector(file_tag: str, dir: str, ignore_folders: list[str]) -> str:
     """
     Draws a streamlit file selector as a dropdown
     Args:
         - file_tag (str): Tag the files role. Used for display purposes.
         - dir (str): Directory of the files to be selected from.
+        - ignore_folders (list): List of folder names to ignore when displaying files.
+    Returns:
+        - str: The full path of the selected file.
     """
     file_paths = sorted(glob.glob(f'{dir}/**/*.mkv', recursive = True))
-    files_with_dir = []
-    for i in range(len(file_paths)):
-        files_with_dir.append(PurePath(file_paths[i]))
-    sel_file = st.selectbox(f'Select the {file_tag} file', files_with_dir)
-    if sel_file != None:
-        sel_file_idx = files_with_dir.index(sel_file)
-        sel_file_path = file_paths[sel_file_idx]
 
+    # Filter out files in ignored folders
+    filtered_files = [path for path in file_paths if PurePath(path).parent.name not in ignore_folders]
+    
+    # Display only the basename of each file in the dropdown
+    display_names = [PurePath(path).name for path in filtered_files]
+
+    # Show the selectbox with display names, and get the selected file's full path
+    selected_display_name = st.selectbox(f'Select the {file_tag} file', display_names)
+    if selected_display_name:
+        # Find the full path of the selected file by matching the basename
+        sel_file_path = next(path for path in filtered_files if PurePath(path).name == selected_display_name)
         return sel_file_path
+
+
+
+    # files_with_dir = []
+    # for i in range(len(file_paths)):
+    #     files_with_dir.append(PurePath(file_paths[i]))
+    # #sel_file = st.selectbox(f'Select the {file_tag} file', files_with_dir)
+    # sel_file = st.selectbox(f'Select the {file_tag} file', file_paths)
+    # if sel_file != None:
+    #     sel_file_idx = files_with_dir.index(sel_file)
+    #     sel_file_path = file_paths[sel_file_idx]
+
+    #     return sel_file_path
 
 def disp_tbl(data: List[Tuple]):
     """
@@ -44,13 +65,16 @@ dir_sel = st.radio('Base directory of reference file:', DIR_INPUTS_REF)
 
 # Selection reference file
 if dir_sel:
-    file_ref = file_selector(file_tag='reference', dir=dir_sel)
+    file_ref = file_selector(file_tag='reference', dir=dir_sel, ignore_folders=['Featurettes'])
 if (file_ref != '') & (Path(file_ref).suffix == '.mkv'):
     file_ref_info = parse_mkv_info(mkvinfo_json(file_ref, DIR_TMP))
     vid_duration = file_ref_info
     audio_tracks_ref = file_ref_info['audio_tracks']
+    duration_ref = str(timedelta(seconds=file_ref_info['duration_seconds'])).split(".")[0]
     st.session_state['audio_tracks_ref'] = audio_tracks_ref
-    # display the audio tracks in a table
+   # display the file stats
+    st.write(f'Duration: {duration_ref}')
+    st.write('Audio tracks:')
     disp_tbl(audio_tracks_ref)
     if len(audio_tracks_ref) > 1:
         # Select audio track
@@ -60,12 +84,15 @@ if (file_ref != '') & (Path(file_ref).suffix == '.mkv'):
         track_id_sel_ref = 0
 
 # Selection source file
-file_src = file_selector(file_tag='source', dir= DIR_INPUT_SRC)
+file_src = file_selector(file_tag='source', dir= DIR_INPUT_SRC, ignore_folders=['Featurettes'])
 if (file_src != '') & (Path(file_src).suffix == '.mkv'):
     file_src_info = parse_mkv_info(mkvinfo_json(file_src, DIR_TMP))
     audio_tracks_src = file_src_info['audio_tracks']
+    duration_src = str(timedelta(seconds=file_src_info['duration_seconds'])).split(".")[0]
     st.session_state['audio_tracks_src'] = audio_tracks_src
-    # display the audio tracks in a table
+    # display the file stats
+    st.write(f'Duration: {duration_src}')
+    st.write('Audio tracks:')
     disp_tbl(audio_tracks_src)
     if len(audio_tracks_src) > 1:
         # Select audio track
@@ -79,6 +106,7 @@ if st.button('Get offset'):
     audio_tracks_src = st.session_state['audio_tracks_src']
     file_ref_audio = extract_audio_track(file_ref, audio_tracks_ref[track_id_sel_ref], DIR_TMP)
     file_src_audio = extract_audio_track(file_src, audio_tracks_src[track_id_sel_src], DIR_TMP)
+    #try:
     offsets, median, std_dev = find_offset(file_ref_audio, file_src_audio)
     if median:
         st.write(f'Offsets: {offsets}')
@@ -88,6 +116,9 @@ if st.button('Get offset'):
         if DEL_TMP_FILES:
             os.remove(file_ref_audio)
             os.remove(file_src_audio)
+    # except Exception:
+    #     st.write('Offset calculation halted:')
+    #     st.write('Audio duration difference > 10min, most likely from different versions')
 
 if st.button('Mux source audio track to reference video'):
     file_muxed = mux_src_to_ref_offset(file_ref, file_src, track_id_sel_src+1, st.session_state['offset'], DIR_OUTPUT)

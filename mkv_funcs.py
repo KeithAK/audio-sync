@@ -163,6 +163,7 @@ def extract_audio_track(mkv_file_path: str, audio_track: List[Tuple[str, str]], 
         "AC-3": "ac3",
         "E-AC-3": "eac3",
         "TrueHD": "thd",
+        "TrueHD Atmos": "thd",
         "DTS-HD Master Audio": "dts",
         "DTS": "dts",
         "AAC": "aac",
@@ -198,15 +199,15 @@ def mux_src_to_ref_offset(file_path_ref_vid: str, file_path_src_vid: str, src_tr
     """
     Merges an audio file from one video file into another video file using mkvmerge, with the audio offset and no "default" flag.
 
-    Parameters:
-    - file_path_ref_vid: str : Path to the reference video file.
-    - file_path_src_vid: str : Path to the source video file.
-    - src_track_id: str : Track ID to merge
-    - offset_src_to_ref: int : Offset in milliseconds from source to reference.
-    - path_output: str : Directory where the merged file will be saved.
+    Args:
+        - file_path_ref_vid: str : Path to the reference video file.
+        - file_path_src_vid: str : Path to the source video file.
+        - src_track_id: str : Track ID to merge
+        - offset_src_to_ref: int : Offset in milliseconds from source to reference.
+        - path_output: str : Directory where the merged file will be saved.
 
     Returns:
-    - str : Path to the created merged video file.
+        - str : Path to the created merged video file.
     """
     # Extract base filename for output
     base_name = os.path.splitext(os.path.basename(file_path_ref_vid))[0]

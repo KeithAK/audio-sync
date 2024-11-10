@@ -38,19 +38,6 @@ def file_selector(file_tag: str, dir: str, ignore_folders: list[str]) -> str:
         sel_file_path = next(path for path in filtered_files if PurePath(path).name == selected_display_name)
         return sel_file_path
 
-
-
-    # files_with_dir = []
-    # for i in range(len(file_paths)):
-    #     files_with_dir.append(PurePath(file_paths[i]))
-    # #sel_file = st.selectbox(f'Select the {file_tag} file', files_with_dir)
-    # sel_file = st.selectbox(f'Select the {file_tag} file', file_paths)
-    # if sel_file != None:
-    #     sel_file_idx = files_with_dir.index(sel_file)
-    #     sel_file_path = file_paths[sel_file_idx]
-
-    #     return sel_file_path
-
 def disp_tbl(data: List[Tuple]):
     """
     Displays a table in Streamlit using specified column headers and data.
@@ -80,8 +67,13 @@ if (file_ref != '') & (Path(file_ref).suffix == '.mkv'):
         # Select audio track
         track_ids = [t['track_id'] for t in audio_tracks_ref]
         track_id_sel_ref = int(st.radio('Select which audio track to use as reference', track_ids))-1
+        # Get index of selected track
+        for i in range(len(audio_tracks_ref)):
+            if track_id_sel_ref+1 == audio_tracks_ref[i]['track_id']:
+                track_sel_idx_ref = i
     else:
         track_id_sel_ref = 0
+        track_sel_idx_ref = 0
 
 # Selection source file
 file_src = file_selector(file_tag='source', dir= DIR_INPUT_SRC, ignore_folders=['Featurettes'])
@@ -98,15 +90,19 @@ if (file_src != '') & (Path(file_src).suffix == '.mkv'):
         # Select audio track
         track_ids = [t['track_id'] for t in audio_tracks_src]
         track_id_sel_src = int(st.radio('Select which audio track to use as source', track_ids))-1
+        # Get index of selected track
+        for i in range(len(audio_tracks_src)):
+            if track_id_sel_src+1 == audio_tracks_src[i]['track_id']:
+                track_sel_idx_src = i
     else:
         track_id_sel_src = 0
+        track_sel_idx_src = 0
 
 if st.button('Get offset'):
     audio_tracks_ref = st.session_state['audio_tracks_ref']
     audio_tracks_src = st.session_state['audio_tracks_src']
-    file_ref_audio = extract_audio_track(file_ref, audio_tracks_ref[track_id_sel_ref], DIR_TMP)
-    file_src_audio = extract_audio_track(file_src, audio_tracks_src[track_id_sel_src], DIR_TMP)
-    #try:
+    file_ref_audio = extract_audio_track(file_ref, audio_tracks_ref[track_sel_idx_ref], DIR_TMP)
+    file_src_audio = extract_audio_track(file_src, audio_tracks_src[track_sel_idx_src], DIR_TMP)
     offsets, median, std_dev = find_offset(file_ref_audio, file_src_audio)
     if median:
         st.write(f'Offsets: {offsets}')
@@ -116,9 +112,6 @@ if st.button('Get offset'):
         if DEL_TMP_FILES:
             os.remove(file_ref_audio)
             os.remove(file_src_audio)
-    # except Exception:
-    #     st.write('Offset calculation halted:')
-    #     st.write('Audio duration difference > 10min, most likely from different versions')
 
 if st.button('Mux source audio track to reference video'):
     file_muxed = mux_src_to_ref_offset(file_ref, file_src, track_id_sel_src+1, st.session_state['offset'], DIR_OUTPUT)

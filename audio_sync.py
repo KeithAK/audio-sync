@@ -111,9 +111,14 @@ def extract_non_center_channels(audio_file, output_file, t_start:str, td_sample:
     """
     # Select channels 0, 1, 3, 4, 5 (all channels except center = channel 2)
     command = [
-        'ffmpeg', '-ss', t_start, '-i', audio_file, '-t', td_sample,
+        'ffmpeg',
+        '-ss', t_start,
+        '-i', audio_file,
+        '-t', td_sample,
         '-filter_complex', 'pan=mono|c0=FL+FR+LFE+SL+SR', 
-        '-ac', '1', '-ar', str(SR), output_file
+        '-ac', '1',
+        '-ar', str(SR),
+        output_file
     ]
     if os.path.exists(output_file):
         os.remove(output_file)

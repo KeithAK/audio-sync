@@ -138,63 +138,6 @@ def list_audio_tracks(mkv_file_path: str) -> List[Tuple[str, str]]:
     except Exception as e:
         raise RuntimeError(f"An error occurred: {e}")
 
-
-def extract_audio_track(mkv_file_path: str, audio_track: List[Tuple[str, str]], output_dir: str) -> str:
-    """
-    Extracts a specified audio track from an .mkv file using mkvextract.
-
-    Parameters:
-    - mkv_file_path: str : Path to the .mkv file.
-    - track_id: int : ID of the audio track to extract.
-    - output_codec: str : Audio codec of the output file. 
-    - output_dir: str : Directory where the extracted file will be saved (default is current directory).
-
-    Returns:
-    - str : Path to the extracted audio file.
-    """
-    # Ensure output directory exists
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-
-    # Determine output file name and path
-    base_name = os.path.splitext(os.path.basename(mkv_file_path))[0]
-    # Dictionary mapping codec names to file extensions
-    codec_extension_map = {
-        "AC-3": "ac3",
-        "E-AC-3": "eac3",
-        "TrueHD": "thd",
-        "TrueHD Atmos": "thd",
-        "DTS-HD Master Audio": "dts",
-        "DTS": "dts",
-        "AAC": "aac",
-        "MP3": "mp3",
-        "FLAC": "flac",
-        "Vorbis": "ogg",
-        "PCM": "wav",
-        "Opus": "opus",
-    }
-    codec = codec_extension_map[audio_track['codec']]
-    output_file_path = os.path.join(output_dir, f"{base_name}_track{audio_track['track_id']}_{audio_track['language']}.{codec}")  # Defaulting to .aac; update if needed
-
-    try:
-        # Execute mkvextract command
-        result = subprocess.run(
-            ['mkvextract', 'tracks', mkv_file_path, f'{audio_track['track_id']}:{output_file_path}'],
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
-        )
-
-        # Check for errors in mkvextract execution
-        if result.returncode != 0:
-            raise RuntimeError(f"mkvextract failed: {result.stderr}")
-        
-        print(f"Track {audio_track['track_id']} extracted successfully to {output_file_path}")
-        return output_file_path
-
-    except FileNotFoundError:
-        raise FileNotFoundError("mkvextract not found. Please ensure mkvtoolnix is installed and mkvextract is accessible.")
-    except Exception as e:
-        raise RuntimeError(f"An error occurred: {e}")
-
 def mux_src_to_ref_offset(file_path_ref_vid: str, file_path_src_vid: str, src_track_id: str, offset_src_to_ref: int, path_output: str) -> str:
     """
     Merges an audio file from one video file into another video file using mkvmerge, with the audio offset and no "default" flag.

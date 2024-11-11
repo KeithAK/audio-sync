@@ -1,173 +1,112 @@
-import subprocess, librosa, os, datetime, json
+import librosa, os, ffmpeg, random
 import numpy as np
 from scipy.signal import correlate
-from config import DEL_TMP_FILES
+from mkv_funcs import mkvinfo_json, parse_mkv_info
+from pathlib import Path
+from config import DEL_TMP_FILES, DIR_TMP, CONSTS
+import streamlit as st
 
 SR = 16000 # audio sample Rate
 # some randomness involved here, will be removed after further testing
 NR_OF_SAMPLES = int(np.random.choice(range(5, 11))) # nr. of samples spread across shortest audio file
 SAMPLE_LEN = int(np.random.choice(range(60, 120))) # sample length in seconds
-
-def get_audio_duration(file_path: str) -> float:
+        
+def extract_multiple_audio_segments(mkv_file_path: list[str], audio_track_id: list[int], timestamps: list, output_dir: str) -> list:
     """
-    Retrieves the duration of an audio file. Uses librosa for compatible formats.
-    For non-compatible formats, ffprobe is used after wrapping files in mkv first.
+    Extracts multiple segments from an audio track in an MKV file and saves them as WAV files.
 
-    Parameters:
-    - file_path: str : Path to the audio file.
+    Args:
+        - mkv_file_path (str): Path to the MKV file.
+        - audio_track_id (int): The ID of the audio track to extract.
+        - timestamps (list): List of tuples (start_time, duration) in seconds.
+        - output_dir (str): Directory to save the output WAV files.
 
     Returns:
-    - float : Duration of the file in seconds.
+        - list: List of paths to the output WAV files.
     """
-    # Get the file extension
-    _, ext = os.path.splitext(file_path)
-    
-    # List of file extensions that require get_truehd_duration
-    custom_formats = [".thd", ".dts"]
+    output_paths = []
+    for i, (start_time, duration) in enumerate(timestamps):
+        # Define the output file path for each segment
+        output_file_path = []
+        output_file_path.append(str(Path(output_dir) / f"{Path(mkv_file_path[0]).stem}_track{audio_track_id[0]}_segment{i+1}.wav"))
+        output_file_path.append(str(Path(output_dir) / f"{Path(mkv_file_path[1]).stem}_track{audio_track_id[1]}_segment{i+1}.wav"))
+        output_paths.append(output_file_path)
 
-    if ext.lower() in custom_formats:
-        # Define a temporary MKV file path
-        temp_mkv_path = file_path + ".mkv"
-        
         try:
-            # Step 1: Wrap the .TrueHD file in an MKV container using ffmpeg
-            subprocess.run(
-                ['ffmpeg', '-y', '-i', file_path, '-c', 'copy', temp_mkv_path],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                check=True
-            )
-            print(file_path)
-            # Step 2: Use ffprobe to get duration of the MKV file
-            result = subprocess.run(
-                [
-                    'ffprobe', '-v', 'error', '-show_entries',
-                    'format=duration', '-of', 'json', temp_mkv_path
-                ],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True
-            )
-            # Parse the duration from JSON output
-            metadata = json.loads(result.stdout)
-            duration = float(metadata["format"]["duration"])
+            for i_mkv in range(len(mkv_file_path)):
+                # input_stream = ffmpeg.input(mkv_file_path[i_mkv], ss=start_time)
+                (
+                    ffmpeg
+                    .input(mkv_file_path[i_mkv], ss=start_time)
+                    .output(
+                        # input_stream,
+                        output_paths[i][i_mkv],
+                        map=f'0:{audio_track_id[i_mkv]+1}',      # Select the specified audio track
+                        t=duration,                     # Set segment duration
+                        af='pan=mono|c0=FL+FR+LFE+SL+SR', # Combine all non-center channels into one
+                        c='pcm_s16le',                  # Set audio codec to PCM 16-bit (WAV format)
+                        ac=1,                           # Set audio channels to mono
+                        ar=CONSTS["sr"],                       # Set audio sample rate to 16000 Hz
+                        loglevel='quiet'                # Supress terminal output
+                    )
+                    .run(overwrite_output=True, capture_stdout=True, capture_stderr=True)
+                )
+            
+        except ffmpeg.Error as e:
+            st.write('stdout:', e.stdout.decode('utf8'))
+            st.write('stderr:', e.stderr.decode('utf8'))
+            raise e
 
-            return duration
+    return output_paths
 
-        except subprocess.CalledProcessError as e:
-            raise RuntimeError(f"ffmpeg or ffprobe failed: {e.stderr}")
-        except FileNotFoundError:
-            raise FileNotFoundError("ffmpeg or ffprobe not found. Please ensure they are installed and accessible.")
-        except KeyError:
-            raise ValueError("Duration not found in ffprobe output.")
-        finally:
-            # Clean up the temporary MKV file
-            if os.path.exists(temp_mkv_path):
-                os.remove(temp_mkv_path)
-    else:
+def find_offset(file_paths: list[str], sel_audio_tracks: list[int]):
+    file_ref_info = parse_mkv_info(mkvinfo_json(file_paths[0], DIR_TMP))
+    file_src_info = parse_mkv_info(mkvinfo_json(file_paths[1], DIR_TMP))
+
+    # STEP 1: get the shorter duration
+    dur_ref = float(file_ref_info['duration_seconds'])
+    if (Path(file_paths[1]).suffix == '.mkv'): # source file is a video file
+        dur_src = float(file_src_info['duration_seconds'])
+
+    else: # source file is an audio file
         try:
-            result = subprocess.run(
-                [
-                    'ffprobe', '-v', 'error', '-show_entries',
-                    'format=duration', '-of', 'json', file_path
-                ],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True
+            dur_src = float(ffmpeg.probe(file_paths[1])["format"]["duration"])
+        # wrap in an .mkv container
+        except Exception:
+            (
+                ffmpeg
+                .input(file_paths[1])
+                .output(str(Path(file_paths[1]).with_suffix('.mkv')), f='matroska')
+                .run(overwrite_output=True)
             )
-            # Parse the duration from JSON output
-            metadata = json.loads(result.stdout)
-            duration = float(metadata["format"]["duration"])
+            dur_src = float(ffmpeg.probe(str(Path(file_paths[1]).with_suffix('.mkv')))["format"]["duration"])
 
-            return duration
-        except Exception as e:
-            raise RuntimeError(f"Error: {e}")
+    dur_min = min(dur_ref, dur_src)
 
-def generate_timestamps(duration, num_timestamps=NR_OF_SAMPLES):
-    """Generates an array of equally spaced timestamps across the given duration."""
-    return np.linspace(0, duration, num_timestamps)
+    # STEP 2 generate timestamps
+    ts_starts = np.linspace(0, dur_min - CONSTS["max_smp_dur"], random.randint(CONSTS["min_nr_of_smp"], CONSTS["max_nr_of_smp"]))
+    timestamps = []
+    for i in range(len(ts_starts)):
+        timestamps.append((float(ts_starts[i]), random.randint(CONSTS["min_smp_dur"], CONSTS["max_smp_dur"])))
 
-def detect_warp_or_stretch(offsets, std_threshold=100):
-    """
-    Detect if one file is warped or stretched relative to the other based on the
-    standard deviation of the calculated offsets.
-    """
-    offsets_filt = np.delete(offsets, [np.argmin(offsets), np.argmax(offsets)])
-    median = np.median(offsets_filt)
-    std_dev = np.std(offsets_filt)
-    
-    # If the standard deviation exceeds the threshold, return True (files may be warped or stretched)
-    if std_dev > std_threshold:
-        print(f"Warning: Files may be warped/stretched. Offsets: {offsets}, std dev: {std_dev:.4f})")
-        return offsets, median, std_dev
-    else:
-        print(f"File 2 has an offset of {round(median)}ms to file 1 (std dev = {std_dev:.4f}).")
-        return offsets, median, std_dev
+    # STEP 3: Extract audio samples from both files without center channel as wav files
+    smp_paths = extract_multiple_audio_segments(file_paths, sel_audio_tracks, timestamps, DIR_TMP)
 
-def extract_non_center_channels(audio_file, output_file, t_start:str, td_sample:str):
-    """
-    Extracts all audio channels except the center channel (channel 2) from a file using ffmpeg,
-    and merges them into a mono track for analysis.
-    """
-    # Select channels 0, 1, 3, 4, 5 (all channels except center = channel 2)
-    command = [
-        'ffmpeg',
-        '-ss', t_start,
-        '-i', audio_file,
-        '-t', td_sample,
-        '-filter_complex', 'pan=mono|c0=FL+FR+LFE+SL+SR', 
-        '-ac', '1',
-        '-ar', str(SR),
-        output_file
-    ]
-    if os.path.exists(output_file):
-        os.remove(output_file)
-    result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    if not os.path.exists(output_file):
-        print(result.stderr.decode())
-        raise FileNotFoundError(f"Failed to create output file: {output_file}")
-    
-def find_offset(file1, file2):
-    """
-    Finds the best fitting offset value that would put file2 in sync with file1.  
-    """
-    if not os.path.exists(file1) & os.path.exists(file2):
-        raise FileNotFoundError
-    # generate timestamps spread across the shortest file
-    duration1 = get_audio_duration(file1)
-    duration2 = get_audio_duration(file2)
-    dur_diff = abs(duration1-duration2)
-    if dur_diff > (15 * 60): # over 10 minutes difference
-        print('Audio most likely warped or from different cuts.')
-        print(f'Duration file1: {datetime.timedelta(seconds=duration1)}, file2: {datetime.timedelta(seconds=duration2)}, difference: {datetime.timedelta(seconds=dur_diff)}')
-        #raise Exception
-        return 0, 0, 0
-    shorter_duration = min(duration1, duration2) # Get the shorter duration
-    t_sample = str(datetime.timedelta(seconds=SAMPLE_LEN))
-    timestamps = generate_timestamps(shorter_duration - SAMPLE_LEN) # Generate 10 timestamps
-    # Step 1: Extract audio from both .mka files to .wav files
-    t_offsets_ms = []
-    for i, t in enumerate(timestamps):
-        file_out_1 = f'tmp/audio{i}_1.wav'
-        file_out_2 = f'tmp/audio{i}_2.wav'
+    # STEP 4: Calculate offsets
+    offsets = []
+    for smp in range(len(smp_paths)):
+        audio1, _ = librosa.load(smp_paths[smp][0], sr=CONSTS["sr"])
+        audio2, _ = librosa.load(smp_paths[smp][1], sr=CONSTS["sr"])
 
-        t_start = str(datetime.timedelta(seconds=t))
-        extract_non_center_channels(file1, file_out_1, t_start, t_sample)
-        extract_non_center_channels(file2, file_out_2, t_start, t_sample)
-
-        # Step 2: Load the extracted audio
-        audio1, _ = librosa.load(file_out_1, sr=SR)
-        audio2, _ = librosa.load(file_out_2, sr=SR)
-
-        # Step 4: Compute cross-correlation
-        correlation = correlate(audio1, audio2)
-
-        # Step 5: Find and print the offset based on maximum correlation
+        correlation = correlate(audio1, audio2, method='fft')
         offset_index = float(np.argmax(correlation))
-        t_offsets_ms.append((offset_index - len(audio1)) * 1000 / SR)
+
+        offsets.append((offset_index - len(audio1)) * 1000 / CONSTS["sr"])
         if DEL_TMP_FILES:
-            os.remove(file_out_1)
-            os.remove(file_out_2)
-    print(f'Offsets calculated from {NR_OF_SAMPLES} samples of {SAMPLE_LEN}s length.')
-    offsets, median, std_dev = detect_warp_or_stretch(t_offsets_ms)
+            [os.remove(path) for path in smp_paths[smp] if os.path.exists(path)]
+    
+    # STEP 5: median and standard deviation
+    median = np.median(np.delete(offsets, [np.argmin(offsets), np.argmax(offsets)]))
+    std_dev = np.std(offsets)
+    
     return offsets, median, std_dev

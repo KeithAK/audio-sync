@@ -2,11 +2,10 @@ import os, glob
 import streamlit as st
 import pandas as pd
 from pathlib import Path, PurePath
-from mkv_funcs import mkvinfo_json, parse_mkv_info, extract_audio_track, mux_src_to_ref_offset
+from mkv_funcs import mkvinfo_json, parse_mkv_info, mux_src_to_ref_offset
 from audio_sync import find_offset
 from typing import List, Tuple
 from datetime import timedelta
-from config import DEL_TMP_FILES
 
 DIR_INPUTS_REF = ['/data/movies', '/data/tv']
 DIR_INPUT_SRC = '/data/src'
@@ -99,19 +98,13 @@ if (file_src != '') & (Path(file_src).suffix == '.mkv'):
         track_sel_idx_src = 0
 
 if st.button('Get offset'):
-    audio_tracks_ref = st.session_state['audio_tracks_ref']
-    audio_tracks_src = st.session_state['audio_tracks_src']
-    file_ref_audio = extract_audio_track(file_ref, audio_tracks_ref[track_sel_idx_ref], DIR_TMP)
-    file_src_audio = extract_audio_track(file_src, audio_tracks_src[track_sel_idx_src], DIR_TMP)
-    offsets, median, std_dev = find_offset(file_ref_audio, file_src_audio)
+    offsets, median, std_dev = find_offset([file_ref, file_src], [track_id_sel_ref, track_id_sel_src])
+
     if median:
         st.write(f'Offsets: {offsets}')
         st.write(f'Median offset after trimming max. and min. value: {round(median)}ms')
         st.write(f'Standard deviation: {std_dev:.1f}ms')
         st.session_state['offset'] = int(round(median))
-        if DEL_TMP_FILES:
-            os.remove(file_ref_audio)
-            os.remove(file_src_audio)
 
 if st.button('Mux source audio track to reference video'):
     file_muxed = mux_src_to_ref_offset(file_ref, file_src, track_id_sel_src+1, st.session_state['offset'], DIR_OUTPUT)

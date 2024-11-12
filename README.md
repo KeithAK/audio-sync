@@ -1,9 +1,9 @@
 # audio-sync
-Tool to help add &amp; synchronise additional audio tracks to video files.
+Tool to help add &amp; synchronise additional audio tracks to video files. For example, if you want to add the German audio track from one copy of a movie to another copy with a higher-quality video track.
 
 Finds the offset between two selected audio tracks in two .mkv files (called reference and source). Can then merge the selected audio track from the source file into the reference file with the calculated offset.
 
-Currently only works with .mkv files with multi-channel audio tracks. (not all audio codecs are 100% supported, still testing)
+Currently only works with .mkv files with multi-channel audio tracks. (the offset is calculated by ignoring the center channel containing dialogue)
 
 ## How to start
 Can be run from project terminal or docker.
@@ -30,7 +30,8 @@ services:
 ```
 ## How to operate
 Controlled via browser.
-* Select the video file where you'd like to add a new track to.
+* Select the media library containing your reference file (where you'd like to add a new track to).
+* Select the reference file (enter keyword in drop-down to search).
   * Select which audio track you'd like to use as reference.
 * Do the same for the source file.
 * Click the "Get Offset" button.

@@ -4,7 +4,6 @@ from scipy.signal import correlate
 from mkv_funcs import mkvinfo_json, parse_mkv_info
 from pathlib import Path
 from config import DEL_TMP_FILES, DIR_TMP, CONSTS
-import streamlit as st
 
 SR = 16000 # audio sample Rate
 # some randomness involved here, will be removed after further testing
@@ -16,8 +15,8 @@ def extract_multiple_audio_segments(mkv_file_path: list[str], audio_track_id: li
     Extracts multiple segments from an audio track in an MKV file and saves them as WAV files.
 
     Args:
-        - mkv_file_path (str): Path to the MKV file.
-        - audio_track_id (int): The ID of the audio track to extract.
+        - mkv_file_path (list[str]): Path to the MKV file.
+        - audio_track_id (list[int]): The ID of the audio track to extract.
         - timestamps (list): List of tuples (start_time, duration) in seconds.
         - output_dir (str): Directory to save the output WAV files.
 
@@ -34,7 +33,6 @@ def extract_multiple_audio_segments(mkv_file_path: list[str], audio_track_id: li
 
         try:
             for i_mkv in range(len(mkv_file_path)):
-                # input_stream = ffmpeg.input(mkv_file_path[i_mkv], ss=start_time)
                 (
                     ffmpeg
                     .input(mkv_file_path[i_mkv], ss=start_time)
@@ -53,8 +51,6 @@ def extract_multiple_audio_segments(mkv_file_path: list[str], audio_track_id: li
                 )
             
         except ffmpeg.Error as e:
-            st.write('stdout:', e.stdout.decode('utf8'))
-            st.write('stderr:', e.stderr.decode('utf8'))
             raise e
 
     return output_paths

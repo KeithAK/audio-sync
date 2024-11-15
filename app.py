@@ -2,10 +2,10 @@ import os, glob
 import streamlit as st
 import pandas as pd
 from pathlib import Path, PurePath
+from datetime import timedelta
 from mkv_funcs import mkvinfo_json, parse_mkv_info, mux_src_to_ref_offset
 from audio_sync import find_offset
 from typing import List, Tuple
-from datetime import timedelta
 
 DIR_INPUTS_REF = ['/data/movies', '/data/tv']
 DIR_INPUT_SRC = '/data/src'
@@ -58,8 +58,8 @@ if (file_ref != '') & (Path(file_ref).suffix == '.mkv'):
     audio_tracks_ref = file_ref_info['audio_tracks']
     duration_ref = str(timedelta(seconds=file_ref_info['duration_seconds'])).split(".")[0]
     st.session_state['audio_tracks_ref'] = audio_tracks_ref
-   # display the file stats
-    st.write(f'Duration: {duration_ref}')
+    # display the file stats
+    disp_tbl([{"Duration": duration_ref, "Fps": file_ref_info["fps"]}])
     st.write('Audio tracks:')
     disp_tbl(audio_tracks_ref)
     if len(audio_tracks_ref) > 1:
@@ -82,7 +82,7 @@ if (file_src != '') & (Path(file_src).suffix == '.mkv'):
     duration_src = str(timedelta(seconds=file_src_info['duration_seconds'])).split(".")[0]
     st.session_state['audio_tracks_src'] = audio_tracks_src
     # display the file stats
-    st.write(f'Duration: {duration_src}')
+    disp_tbl([{"Duration": duration_src, "Fps": file_src_info["fps"]}])
     st.write('Audio tracks:')
     disp_tbl(audio_tracks_src)
     if len(audio_tracks_src) > 1:

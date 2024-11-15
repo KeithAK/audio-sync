@@ -61,23 +61,29 @@ def parse_mkv_info(json_file_path: str) -> dict:
     duration_ns = data.get("container", {}).get("properties", {}).get("duration", 0)
     duration_seconds = duration_ns / 1_000_000_000  # Convert nanoseconds to seconds
 
-    # Extract audio track information
+    # Extract track information
     audio_tracks = []
     for track in data.get("tracks", []):
-        if track.get("type") == "audio":
-            audio_info = {
+        if track.get("type") == "video":
+            default_duration = track["properties"].get("default_duration")
+            if default_duration:
+                # Calculate FPS
+                fps = round((1_000_000_000 / default_duration), 3)
+        elif track.get("type") == "audio":
+            audio_track_info = {
                 "track_id": track.get("id"),
                 "codec": track.get("codec"),
                 "language": track.get("properties", {}).get("language", "N/A"),
                 "track_name": track.get("properties", {}).get("track_name", "N/A")
             }
-            audio_tracks.append(audio_info)
+            audio_tracks.append(audio_track_info)
     
     # Create a result dictionary
     result = {
         "file_name": file_name,
         "title": title,
         "duration_seconds": duration_seconds,
+        "fps": fps,
         "audio_tracks": audio_tracks
     }
     if DEL_TMP_FILES:

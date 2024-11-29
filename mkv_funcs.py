@@ -170,7 +170,7 @@ def mux_src_to_ref_offset(file_path_ref_vid: str, file_path_src_vid: str, src_tr
         '--no-subtitles',       # Only merge audio
         '--audio-tracks', f'{src_track_id}',    # Track ID to merge
         '--track-name', f'{src_track_id}:',     # Ensure no custom track name is set for the audio
-        '--default-track-flag', '0',    # Remove the "default" flag from the audio track
+        '--default-track', f'{src_track_id}:no',    # Remove the "default" flag from the audio track
         '--sync', f'{src_track_id}:{offset_src_to_ref}',    # Apply offset to the audio track
         file_path_src_vid   # Source video file to merge
     ]

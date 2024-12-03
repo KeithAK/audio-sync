@@ -1,5 +1,5 @@
 import os
-DEL_TMP_FILES = os.environ["DEL_TMP_FILES"]
+DEL_TMP_FILES = True
 DIR_TMP = '/data/tmp'
 CONSTS = {
     "min_nr_of_smp": 5,     # min. number of samples taken from files when finding offset

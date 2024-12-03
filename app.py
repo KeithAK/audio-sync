@@ -48,6 +48,7 @@ def disp_tbl(data: List[Tuple]):
 
 # Select base directory of reference file
 dir_sel = st.radio('Base directory of reference file:', DIR_INPUTS_REF)
+add_lang_tag = st.checkbox('Add language tag to output file name:', value=True)
 
 # Selection reference file
 if dir_sel:
@@ -109,4 +110,25 @@ if st.button('Get offset'):
 if st.button('Mux source audio track to reference video'):
     file_muxed = mux_src_to_ref_offset(file_ref, file_src, track_id_sel_src+1, st.session_state['offset'], DIR_OUTPUT)
     if file_muxed:
-        st.write(f'Audio track {track_id_sel_src+1} from *{os.path.basename(file_src)}* successfully merged into *{os.path.basename(file_ref)}* with an offset of {st.session_state['offset']}ms and exported to *{file_muxed}*')
+        if add_lang_tag:
+            # add lang tag to file name
+            file, ext = os.path.splitext(file_muxed)
+            lang_tag = str(f'[+{audio_tracks_src[track_sel_idx_src]['language']}]')
+            # Find the last dash to determine the position to insert the tag
+            if '-' in file:
+                parts = file.rsplit('-', 1)  # Split into two parts from the last dash
+                file_tagged = f"{parts[0]}{lang_tag}-{parts[1]}{ext}"
+
+            else:
+                # If no dash is present, just append the tag
+                file_tagged = f"{file}{lang_tag}{ext}"
+            
+            # rename file to tagged version
+            os.rename(
+                os.path.join(DIR_OUTPUT, Path(file_muxed).name),
+                os.path.join(DIR_OUTPUT, Path(file_tagged))
+            )
+            st.write(f'Audio track {track_id_sel_src+1} from *{os.path.basename(file_src)}* successfully merged into *{os.path.basename(file_ref)}* with an offset of {st.session_state['offset']}ms and exported to *{file_tagged}*')
+
+        else:
+            st.write(f'Audio track {track_id_sel_src+1} from *{os.path.basename(file_src)}* successfully merged into *{os.path.basename(file_ref)}* with an offset of {st.session_state['offset']}ms and exported to *{file_muxed}*')

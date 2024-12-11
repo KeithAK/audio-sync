@@ -44,7 +44,7 @@ def disp_tbl(data: List[Tuple]):
         - data (List[Tuple]): A list of tuples, where each tuple represents a row of data.
     """
     df = pd.DataFrame(data)
-    st.dataframe(df.set_index(df.columns[0]))
+    st.dataframe(df, hide_index=True,)
 
 # Select base directory of reference file
 dir_sel = st.radio('Base directory of reference file:', DIR_INPUTS_REF)

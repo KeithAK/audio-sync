@@ -1,4 +1,3 @@
-import os
 DEL_TMP_FILES = True
 DIR_TMP = '/data/tmp'
 CONSTS = {

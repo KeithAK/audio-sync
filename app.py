@@ -27,6 +27,11 @@ def file_selector(file_tag: str, dir: str, ignore_folders: list[str]) -> str:
     # Filter out files in ignored folders
     filtered_files = [path for path in file_paths if PurePath(path).parent.name not in ignore_folders]
     
+    # Handle the case where no files are found
+    if not filtered_files:
+        st.warning(f"No files found in '{dir}' matching the criteria for {file_tag}.")
+        return ''  # Return ''
+    
     # Display only the basename of each file in the dropdown
     display_names = [PurePath(path).name for path in filtered_files]
 

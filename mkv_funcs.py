@@ -83,8 +83,8 @@ def parse_mkv_info(json_file_path: str) -> dict:
     result = {
         "file_name": file_name,
         "title": title,
-        "duration_seconds": duration_seconds,
-        "fps": fps,
+        "duration_seconds": duration_seconds if 'duration_seconds' in locals() else 0,
+        "fps": fps if 'fps' in locals() else 0,
         "audio_tracks": audio_tracks
     }
     if DEL_TMP_FILES:

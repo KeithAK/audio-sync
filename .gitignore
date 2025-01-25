@@ -168,3 +168,6 @@ exp/*
 
 #docker-compose
 docker-compose.yml
+
+#workspace
+audio-sync.code-workspace

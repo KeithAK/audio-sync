@@ -103,6 +103,6 @@ def find_offset(file_paths: list[str], sel_audio_tracks: list[int]):
     
     # STEP 5: median and standard deviation
     median = np.median(np.delete(offsets, [np.argmin(offsets), np.argmax(offsets)]))
-    std_dev = np.std(offsets)
+    std_dev = np.std(np.delete(offsets, [np.argmin(offsets), np.argmax(offsets)]))
     
     return offsets, median, std_dev
